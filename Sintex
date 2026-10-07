@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Master Oros — Simulador MLB Pro por Fases (Abridor y Bullpen)</title>
+
+<style>
+:root{
+ --bg:#121212;--card:#1e1e1e;--text:#e0e0e0;--muted:#9e9e9e;
+ --line:#2c2c2c;--accent:#2196f3;--ok:#4caf50;--purple:#bb86fc;--warn:#ff9800
+}
+*{box-sizing:border-box}
+body{
+ margin:0;background:var(--bg);color:var(--text);
+ font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif
+}
+.wrap{max-width:1150px;margin:auto;padding:14px}
+header,.panel,.results,.team-panel{
+ background:var(--card);border:1px solid var(--line);
+ border-radius:14px;padding:15px;margin-bottom:14px
+}
+h1{margin:0 0 5px;font-size:23px;color:#fff}
+h2{margin:0 0 12px;font-size:18px;color:#fff}
+<h3>{margin:0;font-size:15px;color:#fff}
+.note{color:var(--muted);line-height:1.45;font-size:13px}
+.toolbar,.actions{
+ display:flex;gap:9px;flex-wrap:wrap;align-items:end
+}
+.control{min-width:165px;flex:1}
+label{
+ display:block;font-size:12px;font-weight:700;margin-bottom:4px;color:var(--muted)
+}
+input,select,button{
+ width:100%;padding:10px;border:1px solid #333;
+ border-radius:9px;font:inherit;background:#2a2a2a;color:#fff
+}
+button{cursor:pointer;font-weight:700}
+.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.status{
+ padding:10px;border-radius:9px;background:#1a2332;margin-top:10px;color:#90caf9;font-size:13px
+}
+.teams{
+ display:grid;grid-template-columns:1fr 1fr;gap:14px
+}
+.team-panel.local{border-top:4px solid #4caf50}
+.team-panel.visitor{border-top:4px solid #ff9800}
+.team-head{
+ display:flex;justify-content:space-between;align-items:center;
+ margin-bottom:10px
+}
+.badge{
+ font-size:11px;font-weight:800;padding:3px 7px;
+ border-radius:99px;background:#2c2c2c;color:#fff
+}
+.metrics{
+ display:grid;grid-template-columns:1fr 1fr;gap:8px
+}
+.alt-pitcher-box{
+ grid-column: span 2;background:#25221b;border:1px solid #4a3820;padding:10px;border-radius:8px;margin-top:4px
+}
+.result-grid{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+ gap:9px
+}
+.result{
+ border:1px solid var(--line);border-radius:9px;padding:10px;background:#252525
+}
+.result b{display:block;margin-bottom:4px;color:#fff}
+.audit{
+ margin-top:10px;padding:10px;border-radius:9px;
+ background:#222;border:1px solid var(--line);
+ font-size:12px;line-height:1.5
+}
+.bet-card{
+ background:#262626;border:1px solid #3a3a3a;border-radius:10px;padding:12px;margin-top:8px
+}
+.bet-title{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.bet-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bet-option{
+ background:#323232;border:1px solid #444;border-radius:8px;padding:10px;text-align:center
+}
+.bet-option span{display:block;font-size:12px;color:var(--muted)}
+.bet-option b{font-size:14px;color:#fff}
+.parlay-box{
+ background:#1e182e;border:1px solid #4a2872;border-radius:10px;padding:14px;margin-top:12px
+}
+.good{color:var(--ok);font-weight:700}
+.purple-text{color:var(--purple);font-weight:700}
+.warn-text{color:var(--warn);font-weight:700}
+@media(max-width:760px){
+ .teams,.metrics{grid-template-columns:1fr}
+ .wrap{padding:9px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+<header>
+
+<h1>Master Oros — Simulador MLB Pro por Fases de Juego</h1>
+
+<div class="note">
+Motor con simulación escalonada: Fase 1 (Abridor oficial en entradas 1 a 6) y Fase 2 (Transición y Bullpen en entradas 7 a 9).
+</div>
+
+<div class="toolbar" style="margin-top:12px">
+<div class="control">
+<label>Simulaciones</label>
+<select id="sims">
+<option>1000</option>
+<option>5000</option>
+<option selected>25000</option>
+<option>50000</option>
+<option>100000</option>
+</select>
+</div>
+<div class="control">
+<label>Semilla reproducible</label>
+<input id="seed" type="number" value="20260930">
+</div>
+<div class="control">
+<label>Ventaja local %</label>
+<input id="homeAdv" type="number" step=".1" value="3.5">
+</div>
+</div>
+
+<div class="actions" style="margin-top:12px">
+<div class="control">
+<button class="primary" id="run">▶ Ejecutar simulación por fases</button>
+</div>
+<div class="control">
+<button id="clear">Limpiar entradas</button>
+</div>
+</div>
+
+<div id="status" class="status">
+Sistema listo. Modelo escalonado Abridor/Bullpen activo.
+</div>
+
+</header>
+
+<section class="panel">
+
+<h2>⚾ Selección de Equipos y Control de Lanzadores</h2>
+
+<div class="teams">
+
+<!-- LOCAL -->
+<div class="team-panel local">
+<div class="team-head"><h3>Equipo local</h3><span class="badge">LOCAL</span></div>
+<div class="metrics">
+<div style="grid-column: span 2">
+  <label>Seleccionar Equipo Oficial (Local)</label>
+  <select id="selectA"><option value="">-- Elige un equipo --</option></select>
+</div>
+<div><label>Nombre</label><input id="m_nombreA"></div>
+<div><label>Carreras / juego *</label><input id="m_rA" type="number" step=".01"></div>
+<div><label>Carreras permitidas / juego</label><input id="m_raA" type="number" step=".01"></div>
+<div><label>OPS</label><input id="m_opsA" type="number" step=".001"></div>
+<div><label>HR / juego</label><input id="m_hrA" type="number" step=".01"></div>
+<div><label>K%</label><input id="m_kA" type="number" step=".1"></div>
+<div><label>BB%</label><input id="m_bbA" type="number" step=".1"></div>
+<div><label>ERA abridor base</label><input id="m_eraA" type="number" step=".01"></div>
+<div><label>ERA bullpen</label><input id="m_bullA" type="number" step=".01"></div>
+<div><label>Defensa</label><input id="m_defA" type="number" step=".01"></div>
+
+<div class="alt-pitcher-box">
+  <label class="warn-text">⚠️ Abridor Alternativo / Manual (Local)</label>
+  <div style="margin-top:4px">
+    <label style="font-size:10px">Escribe ERA manual (Opcional)</label>
+    <input id="altEraA" type="number" step=".01" placeholder="Ej. 5.20">
+  </div>
+</div>
+
+</div>
+</div>
+
+<!-- VISITANTE -->
+<div class="team-panel visitor">
+<div class="team-head"><h3>Equipo visitante</h3><span class="badge">VISITANTE</span></div>
+<div class="metrics">
+<div style="grid-column: span 2">
+  <label>Seleccionar Equipo Oficial (Visitante)</label>
+  <select id="selectB"><option value="">-- Elige un equipo --</option></select>
+</div>
+<div><label>Nombre</label><input id="m_nombreB"></div>
+<div><label>Carreras / juego *</label><input id="m_rB" type="number" step=".01"></div>
+<div><label>Carreras permitidas / juego</label><input id="m_raB" type="number" step=".01"></div>
+<div><label>OPS</label><input id="m_opsB" type="number" step=".001"></div>
+<div><label>HR / juego</label><input id="m_hrB" type="number" step=".01"></div>
+<div><label>K%</label><input id="m_kB" type="number" step=".1"></div>
+<div><label>BB%</label><input id="m_bbB" type="number" step=".1"></div>
+<div><label>ERA abridor base</label><input id="m_eraB" type="number" step=".01"></div>
+<div><label>ERA bullpen</label><input id="m_bullB" type="number" step=".01"></div>
+<div><label>Defensa</label><input id="m_defB" type="number" step=".01"></div>
+
+<div class="alt-pitcher-box">
+  <label class="warn-text">⚠️ Abridor Alternativo / Manual (Visitante)</label>
+  <div style="margin-top:4px">
+    <label style="font-size:10px">Escribe ERA manual (Opcional)</label>
+    <input id="altEraB" type="number" step=".01" placeholder="Ej. 4.80">
+  </div>
+</div>
+
+</div>
+</div>
+
+</div>
+</section>
+
+<section id="results" class="results">
+<h2>Resultado de la Simulación por Fases</h2>
+<div class="note">Aún no se ha ejecutado una simulación.</div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+const MLB_DATA = [
+ {nombre: "Milwaukee Brewers", r: 5.14, ra: 3.81, ops: 0.744, hr: 0.95, k: 22.0, bb: 10.6, era: 3.42, bull: 3.75, def: 0.986},
+ {nombre: "Los Angeles Dodgers", r: 4.94, ra: 3.70, ops: 0.762, hr: 1.26, k: 20.4, bb: 10.1, era: 3.35, bull: 3.98, def: 0.985},
+ {nombre: "Tampa Bay Rays", r: 4.54, ra: 3.65, ops: 0.728, hr: 1.04, k: 18.8, bb: 8.4, era: 3.39, bull: 3.78, def: 0.987},
+ {nombre: "Atlanta Braves", r: 4.58, ra: 3.89, ops: 0.718, hr: 1.26, k: 21.6, bb: 7.7, era: 3.61, bull: 4.02, def: 0.984},
+ {nombre: "New York Yankees", r: 4.59, ra: 4.12, ops: 0.720, hr: 1.39, k: 22.1, bb: 8.8, era: 3.85, bull: 4.31, def: 0.983},
+ {nombre: "San Diego Padres", r: 4.46, ra: 4.01, ops: 0.717, hr: 1.13, k: 20.2, bb: 8.3, era: 3.79, bull: 4.18, def: 0.985},
+ {nombre: "Chicago Cubs", r: 5.25, ra: 4.25, ops: 0.767, hr: 1.36, k: 21.1, bb: 10.6, era: 3.98, bull: 4.12, def: 0.982},
+ {nombre: "Philadelphia Phillies", r: 4.40, ra: 4.08, ops: 0.707, hr: 1.12, k: 21.4, bb: 8.4, era: 3.82, bull: 4.35, def: 0.984},
+ {nombre: "Boston Red Sox", r: 4.25, ra: 4.21, ops: 0.716, hr: 1.01, k: 21.7, bb: 8.5, era: 4.05, bull: 4.28, def: 0.981},
+ {nombre: "Arizona Diamondbacks", r: 4.56, ra: 4.41, ops: 0.720, hr: 1.02, k: 19.4, bb: 8.8, era: 4.15, bull: 4.58, def: 0.982},
+ {nombre: "Cleveland Guardians", r: 4.19, ra: 3.82, ops: 0.696, hr: 0.99, k: 20.8, bb: 9.4, era: 3.58, bull: 3.99, def: 0.986},
+ {nombre: "Chicago White Sox", r: 4.79, ra: 4.08, ops: 0.726, hr: 1.27, k: 24.1, bb: 9.5, era: 3.78, bull: 4.25, def: 0.983},
+ {nombre: "Pittsburgh Pirates", r: 4.73, ra: 4.22, ops: 0.734, hr: 1.15, k: 22.0, bb: 8.0, era: 3.95, bull: 4.39, def: 0.982},
+ {nombre: "Houston Astros", r: 4.53, ra: 4.35, ops: 0.733, hr: 1.40, k: 21.9, bb: 8.7, era: 4.08, bull: 4.29, def: 0.984},
+ {nombre: "Texas Rangers", r: 4.15, ra: 4.49, ops: 0.705, hr: 0.98, k: 21.6, bb: 8.2, era: 4.18, bull: 4.62, def: 0.981},
+ {nombre: "Miami Marlins", r: 4.41, ra: 4.18, ops: 0.726, hr: 1.04, k: 22.8, bb: 7.1, era: 3.88, bull: 4.38, def: 0.982},
+ {nombre: "Baltimore Orioles", r: 4.46, ra: 4.55, ops: 0.711, hr: 1.24, k: 25.0, bb: 9.6, era: 4.31, bull: 4.69, def: 0.980},
+ {nombre: "Toronto Blue Jays", r: 4.00, ra: 4.45, ops: 0.688, hr: 0.92, k: 20.8, bb: 8.4, era: 4.15, bull: 4.61, def: 0.983},
+ {nombre: "Washington Nationals", r: 5.07, ra: 4.62, ops: 0.744, hr: 1.30, k: 23.0, bb: 7.4, era: 4.39, bull: 4.82, def: 0.980},
+ {nombre: "Minnesota Twins", r: 4.56, ra: 4.39, ops: 0.720, hr: 1.15, k: 21.4, bb: 7.9, era: 4.11, bull: 4.58, def: 0.982},
+ {nombre: "St. Louis Cardinals", r: 4.44, ra: 4.36, ops: 0.691, hr: 1.03, k: 20.2, bb: 8.1, era: 4.12, bull: 4.48, def: 0.983},
+ {nombre: "Detroit Tigers", r: 4.46, ra: 4.32, ops: 0.720, hr: 1.12, k: 22.9, bb: 9.5, era: 4.02, bull: 4.49, def: 0.984},
+ {nombre: "Seattle Mariners", r: 4.10, ra: 4.18, ops: 0.702, hr: 1.01, k: 23.9, bb: 7.6, era: 3.91, bull: 4.32, def: 0.985},
+ {nombre: "Cincinnati Reds", r: 4.11, ra: 4.58, ops: 0.699, hr: 1.31, k: 25.5, bb: 9.2, era: 4.35, bull: 4.75, def: 0.981},
+ {nombre: "New York Mets", r: 4.31, ra: 4.55, ops: 0.705, hr: 1.26, k: 21.8, bb: 7.8, era: 4.28, bull: 4.72, def: 0.981},
+ {nombre: "Kansas City Royals", r: 4.26, ra: 4.72, ops: 0.718, hr: 1.05, k: 20.9, bb: 8.4, era: 4.48, bull: 4.95, def: 0.979},
+ {nombre: "San Francisco Giants", r: 4.13, ra: 4.78, ops: 0.706, hr: 1.10, k: 23.5, bb: 7.2, era: 4.55, bull: 4.98, def: 0.978},
+ {nombre: "Oakland Athletics", r: 4.31, ra: 4.98, ops: 0.719, hr: 1.20, k: 22.4, bb: 8.5, era: 4.79, bull: 5.21, def: 0.977},
+ {nombre: "Los Angeles Angels", r: 4.04, ra: 5.12, ops: 0.679, hr: 0.91, k: 25.5, bb: 8.4, era: 4.86, bull: 5.29, def: 0.976},
+ {nombre: "Colorado Rockies", r: 4.64, ra: 5.61, ops: 0.739, hr: 1.11, k: 22.8, bb: 8.1, era: 5.38, bull: 5.88, def: 0.975}
+];
+
+let rngState = 20260930;
+const $ = id => document.getElementById(id);
+
+function initSelects(){
+ const selA = $("selectA"); const selB = $("selectB");
+ MLB_DATA.sort((a,b)=>a.nombre.localeCompare(b.nombre)).forEach(t => {
+  const oA = document.createElement("option"); oA.value = t.nombre; oA.textContent = t.nombre; selA.appendChild(oA);
+  const oB = document.createElement("option"); oB.value = t.nombre; oB.textContent = t.nombre; selB.appendChild(oB);
+ });
+}
+
+function applyTeam(teamName, side){
+ const team = MLB_DATA.init ? null : MLB_DATA.find(t => t.nombre === teamName);
+ if(!team) return;
+ $("m_nombre" + side).value = team.nombre;
+ $("m_r" + side).value = team.r;
+ $("m_ra" + side).value = team.ra;
+ $("m_ops" + side).value = team.ops;
+ $("m_hr" + side).value = team.hr;
+ $("m_k" + side).value = team.k;
+ $("m_bb" + side).value = team.bb;
+ $("m_era" + side).value = team.era;
+ $("m_bull" + side).value = team.bull;
+ $("m_def" + side).value = team.def;
+ $("altEra" + side).value = "";
+}
+
+$("selectA").onchange = (e) => applyTeam(e.target.value, "A");
+$("selectB").onchange = (e) => applyTeam(e.target.value, "B");
+
+function val(id){ const n = Number($(id)?.value); return Number.isFinite(n) ? n : null; }
+function nm(id){ return $(id)?.value?.trim() || ""; }
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+function pct(x){ return (100 * x).toFixed(2) + "%"; }
+function rec(m, k){ m[k] = (m[k] || 0) + 1; }
+
+function topN(m, N, n=10){
+ return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>({key: x[0], n: x[1], p: x[1]/N}));
+}
+
+function normalize2(a, b){
+ const s = a + b;
+ if(!Number.isFinite(s) || s <= 0) return {A: 0.5, B: 0.5};
+ return {A: a/s, B: b/s};
+}
+
+function seedRandom(v){ rngState = (Number(v)>>>0) || 1; }
+function rnd(){ rngState = (1664525 * rngState + 1013904223)>>>0; return rngState / 4294967296; }
+
+function poisson(lambda){
+ lambda = Math.max(0, Number(lambda) || 0);
+ if(lambda === 0) return 0;
+ const L = Math.exp(-lambda);
+ let p = 1, k = 0;
+ do{ k++; p *= rnd(); }while(p > L && k < 1000);
+ return k - 1;
+}
+
+function homeFactor(){
+ const h = val("homeAdv");
+ return h === null ? 1.03 : clamp(1 + h/100, .85, 1.20);
+}
+
+// --- ALGORITMO DE SIMULACIÓN POR FASES (ABRIDOR VS BULLPEN) ---
+function mlbN(N){
+ const rA = val("m_rA") ?? 4.6; const rB = val("m_rB") ?? 4.6;
+ const raA = val("m_raA") ?? 4.4; const raB = val("m_raB") ?? 4.4;
+
+ let baseA = 0.55 * rA + 0.45 * raB;
+ let baseB = 0.55 * rB + 0.45 * raA;
+
+ const opsA = val("m_opsA") ?? 0.720; const opsB = val("m_opsB") ?? 0.720;
+ const opsDiff = clamp((opsA - opsB) / 0.8, -0.15, 0.15);
+ baseA *= (1 + opsDiff * 0.4);
+ baseB *= (1 - opsDiff * 0.4);
+
+ const kA = val("m_kA") ?? 21; const kB = val("m_kB") ?? 21;
+ const bbA = val("m_bbA") ?? 8; const bbB = val("m_bbB") ?? 8;
+ baseA *= clamp(1 + ((bbA - kB) * 0.003), 0.90, 1.10);
+ baseB *= clamp(1 + ((bbB - kA) * 0.003), 0.90, 1.10);
+
+ // Fases de pitcheo: Abridor (Fase 1: 65% del peso en entradas 1-6) y Bullpen (Fase 2: 35% del peso en entradas 7-9)
+ const manualEraA = val("altEraA");
+ const manualEraB = val("altEraB");
+ const effEraA = (manualEraA !== null && manualEraA > 0) ? manualEraA : (val("m_eraA") ?? 4.0);
+ const effEraB = (manualEraB !== null && manualEraB > 0) ? manualEraB : (val("m_eraB") ?? 4.0);
+ const bullA = val("m_bullA") ?? 4.0; const bullB = val("m_bullB") ?? 4.0;
+
+ // Ponderación escalonada real
+ const pitcherPhaseA = (effEraB * 0.65) + (bullB * 0.35);
+ const pitcherPhaseB = (effEraA * 0.65) + (bullA * 0.35);
+
+ let lambdaA = baseA * clamp(pitcherPhaseA / 4.2, 0.70, 1.35);
+ let lambdaB = baseB * clamp(pitcherPhaseB / 4.2, 0.70, 1.35);
+
+ lambdaA *= homeFactor();
+ lambdaA = clamp(lambdaA, 0.5, 12);
+ lambdaB = clamp(lambdaB, 0.5, 12);
+
+ let A = 0, B = 0;
+ const score = {}; const totals = {};
+ let overCounts = {7.5: 0, 8.5: 0};
+ let spreadACount = 0;
+
+ for(let i = 0; i < N; i++){
+  const a = poisson(lambdaA);
+  const b = poisson(lambdaB);
+  if(a > b) A++; else if(b > a) B++;
+  else { if(rnd() < 0.5) A++; else B++; }
+
+  if(a - b >= 2) spreadACount++;
+
+  const tot = a + b;
+  rec(score, `${a}-${b}`);
+  rec(totals, String(tot));
+
+  if(tot > 7.5) overCounts[7.5]++;
+  if(tot > 8.5) overCounts[8.5]++;
+ }
+
+ const pMC = normalize2(A/N, B/N);
+
+ return {
+  sport: "MLB",
+  a: nm("m_nombreA") || "Local",
+  b: nm("m_nombreB") || "Visitante",
+  N, seed: val("seed"),
+  pMC, scoreTop: topN(score, N), totalsTop: topN(totals, N),
+  spreadAProb: spreadACount/N,
+  overs: {
+   7.5: overCounts[7.5]/N,
+   8.5: overCounts[8.5]/N
+  },
+  auditInfo: {
+   eraAUsed: effEraA, isAltA: (manualEraA !== null && manualEraA > 0),
+   eraBUsed: effEraB, isAltB: (manualEraB !== null && manualEraB > 0)
+  }
+ };
+}
+
+function renderPrediction(p){
+ const oddsA = (1 / Math.max(0.1, p.pMC.A) * 0.92).toFixed(2);
+ const oddsB = (1 / Math.max(0.1, p.pMC.B) * 0.92).toFixed(2);
+ const oddsOver75 = (1 / Math.max(0.1, p.overs[7.5]) * 0.92).toFixed(2);
+ const oddsUnder75 = (1 / Math.max(0.1, 1 - p.overs[7.5]) * 0.92).toFixed(2);
+
+ let html = `
+ <div class="result-grid">
+ <div class="result"><b>${p.a} (Local)</b>${pct(p.pMC.A)}</div>
+ <div class="result"><b>${p.b} (Visitante)</b>${pct(p.pMC.B)}</div>
+ </div>
+ `;
+
+ html += `
+ <div class="audit" style="border-left: 4px solid var(--purple)">
+ <b>🔍 Auditoría del Modelo por Fases (Abridor + Bullpen):</b><br>
+ • <b>Local (${p.a}):</b> ERA Abridor <b>${p.auditInfo.eraAUsed}</b> ${p.auditInfo.isAltA ? '<span class="warn-text">(⚠️ Manual)</span>' : '(✅ Oficial)'}<br>
+ • <b>Visitante (${p.b}):</b> ERA Abridor <b>${p.auditInfo.eraBUsed}</b> ${p.auditInfo.isAltB ? '<span class="warn-text">(⚠️ Manual)</span>' : '(✅ Oficial)'}
+ </div>
+ `;
+
+ html += `
+ <div class="bet-card">
+ <div class="bet-title">📊 Money Line (Ganador del Partido)</div>
+ <div class="bet-grid">
+  <div class="bet-option"><span>${p.a}</span><b>${oddsA}x</b></div>
+  <div class="bet-option"><span>${p.b}</span><b>${oddsB}x</b></div>
+ </div>
+ </div>
+
+ <div class="bet-card">
+ <div class="bet-title">📈 Carreras Totales (Línea 7.5)</div>
+ <div class="bet-grid">
+  <div class="bet-option"><span>Over 7.5 (${pct(p.overs[7.5])})</span><b>${oddsOver75}x</b></div>
+  <div class="bet-option"><span>Under 7.5 (${pct(1 - p.overs[7.5])})</span><b>${oddsUnder75}x</b></div>
+ </div>
+ </div>
+ `;
+
+ const diffProb = Math.abs(p.pMC.A - p.pMC.B);
+ let safeTeam = "";
+ let safeTeamProb = 0;
+ 
+ if(diffProb < 0.05){
+  safeTeam = p.pMC.A >= p.pMC.B ? `${p.a} (Hándicap Seguro +1.5)` : `${p.b} (Hándicap Seguro +1.5)`;
+  safeTeamProb = Math.max(p.pMC.A, p.pMC.B) + 0.12;
+ } else {
+  safeTeam = p.pMC.A >= p.pMC.B ? `${p.a} (Money Line Sólido)` : `${p.b} (Money Line Sólido)`;
+  safeTeamProb = Math.max(p.pMC.A, p.pMC.B);
+ }
+
+ const safeTotalText = p.overs[7.5] > 0.55 ? `Over 7.5 Carreras` : `Under 7.5 Carreras`;
+ const safeTotalProb = p.overs[7.5] > 0.55 ? p.overs[7.5] : (1 - p.overs[7.5]);
+ const estParlayOdd = (Number(oddsA) < Number(oddsB) ? Number(oddsA) : Number(oddsB)) * Number(oddsOver75);
+
+ html += `
+ <div class="parlay-box">
+ <h3>🛡️ Parlay Algorítmico por Fases</h3>
+ <p class="note" style="margin:4px 0 8px">Combinación equilibrada considerando el desgaste del abridor y el bullpen:</p>
+ <ul>
+  <li><b>Selección 1:</b> <span class="good">${safeTeam}</span> (Confianza: ${pct(safeTeamProb)})</li>
+  <li><b>Selección 2:</b> <span class="good">${safeTotalText}</span> (Confianza: ${pct(safeTotalProb)})</li>
+ </ul>
+ <hr style="border:0;border-top:1px solid #4a2872;margin:8px 0">
+ <div>• Cuota Combinada Estimada del Parlay: <b class="purple-text">@${estParlayOdd.toFixed(2)}x</b></div>
+ </div>
+ `;
+
+ html += `<div class="audit" style="margin-top:10px"><b>Top 5 Marcadores más repetidos:</b><ol>` + p.scoreTop.slice(0,5).map(x=>`<li>${x.key} — ${x.p.toFixed(2)}%</li>`).join("") + `</ol></div>`;
+
+ $("results").innerHTML = `<h2>Resultado — ${p.sport} (${p.N.toLocaleString()} sims)</h2>` + html;
+}
+
+$("run").onclick = () => {
+ try{
+  seedRandom(val("seed") || 20260930);
+  const p = mlbN(Number($("sims").value));
+  renderPrediction(p);
+ }catch(e){
+  $("results").innerHTML=`<div class="error"><b>Error:</b> ${e.message}</div>`;
+ }
+};
+
+$("clear").onclick = () => {
+ document.querySelectorAll("input").forEach(i => { if(i.id !== "seed" && i.id !== "homeAdv") i.value = ""; });
+ $("selectA").value = ""; $("selectB").value = "";
+ $("altEraA").value = ""; $("altEraB").value = "";
+ $("results").innerHTML = `<h2>Resultado</h2><div class="note">Entradas limpiadas.</div>`;
+};
+
+initSelects();
+</script>
+
+</body>
+</html>
